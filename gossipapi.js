@@ -1,5 +1,6 @@
 // BASE SETUP
 // =============================================================================
+"use strict";
 
 // call the packages we need
 var express    = require('express');
@@ -8,7 +9,6 @@ var app        = express();
 var morgan     = require('morgan');
 var autoIncrement = require('mongoose-auto-increment');
 var cors = require('cors');
-require('run-middleware')(app)
 var https = require('https');
 
 // configure app
@@ -21,10 +21,10 @@ app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-var port     = process.env.PORT || 8085; // set our port
+var port     = process.env.PORT || 3010; // set our port
 
 var mongoose   = require('mongoose');
-var connection = mongoose.createConnection("mongodb://localhost/apilab"); // connect to our database
+var connection = mongoose.createConnection("mongodb://localhost/gossiplab"); // connect to our database
 
 autoIncrement.initialize(connection);
 
@@ -62,8 +62,8 @@ router.route('/users')
 		bear.save(function(err) {
 			if (err)
 				res.send(err);
-
-			res.json({ message: 'User created!' });
+			else
+				res.json({ message: 'User created!' });
 		});
 
 
@@ -103,12 +103,13 @@ router.route('/gossip/worker/:token')
                         	bear.save(function(err) {
                                 	if (err)
                                         	res.send(err);
-					console.log('sending a success message');
+					//console.log('sending a success message');
                                 	res.json({message: 'Message stored!'});
                         	});
                 	});
 		} else {
 			// Handle want message
+			
 		}
 	})
 
@@ -135,19 +136,23 @@ function messageWorker(token)
 			var index = getRandomInt(0, from.messages.length-1);
 			var message = from.messages[index];
 
+			console.log("from: " + from.token);
+
                         // Get a random user to send the random message to
-			Bear.find(function(err, bears) {
+			Bear.find({token: {$ne: token}}, function(err, bears) {
                         	if (err)
                                 	res.send(err);
 
                         	var rnd = getRandomInt(0, bears.length-1);
 				var to = bears[rnd];
+				
+				console.log("to: " + to.token);
 
 				// All of this is to send the message to the user and store it in their document
 				var options = {
   					hostname: 'emeraldelements.com',
   					port: 443,
-					path: '/462api/gossip/worker/' + token,
+					path: '/gossipapi/gossip/worker/' + to.token,
 					method: 'POST',
 					headers: {
           					'Content-Type': 'application/json',
@@ -157,11 +162,11 @@ function messageWorker(token)
 
 				var req = https.request(options, (res) => {
 					res.setEncoding('utf8');
-                			let rawData = '';
+                			var rawData = '';
                 			res.on('data', (chunk) => rawData += chunk);
                 			res.on('end', () => {
                        	 			try {
-                                			let parsedData = JSON.parse(rawData);
+                                			var parsedData = JSON.parse(rawData);
                                 			console.log(parsedData);
                         			} catch (e) {
                                 			console.log(e.message);
@@ -178,7 +183,7 @@ function messageWorker(token)
                 	});
                 });
 
-	setTimeout(messageWorker.bind(this,token), 60000);
+	setTimeout(messageWorker.bind(this,token), 5000);
 }
 
 
@@ -307,7 +312,7 @@ router.route('/bears/:bear_id')
 
 
 // REGISTER OUR ROUTES -------------------------------
-app.use('/api', router);
+app.use('/', router);
 
 // START THE SERVER
 // =============================================================================
